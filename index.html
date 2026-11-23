@@ -38,12 +38,20 @@ setInterval(()=>tx({t:'ping'}),25000);
 let pr={speak:localStorage.sp!=='0',mic:localStorage.mc!=='0'},listening=false,rec,lastQ='';
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 if(window.speechSynthesis)speechSynthesis.getVoices();
-const arVoice=()=>window.speechSynthesis&&speechSynthesis.getVoices().find(v=>/^ar/i.test(v.lang));
-function speakQ(t){const done=()=>tx({t:'readdone'});
- if(!pr.speak||!arVoice()){setTimeout(done,300);return;}
- try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='ar-SA';u.voice=arVoice();u.rate=.95;u.onend=done;u.onerror=done;speechSynthesis.speak(u);}catch(e){done();}}
+let tts='';
+const getAr=()=>window.speechSynthesis?speechSynthesis.getVoices().find(v=>/^ar/i.test(v.lang)):null;
+function speakQ(t,manual){const done=()=>{if(!manual)tx({t:'readdone'});};
+ if(!window.speechSynthesis){tts='متصفحك ما بيدعم القراءة الصوتية';render();done();return;}
+ if(!pr.speak&&!manual){setTimeout(done,300);return;}
+ const go=()=>{const v=getAr(),n=speechSynthesis.getVoices().length,u=new SpeechSynthesisUtterance(t);let started=false;
+  u.lang='ar-SA';if(v)u.voice=v;u.rate=.95;
+  u.onstart=()=>{started=true;tts='';render();};u.onend=done;
+  u.onerror=ev=>{tts='تعذّر تشغيل الصوت ('+ev.error+'، '+n+' أصوات). اضغط «اسمع السؤال»';render();done();};
+  try{if(speechSynthesis.speaking||speechSynthesis.pending)speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){done();return;}
+  setTimeout(()=>{if(!started){tts='الصوت ما بدأ ('+n+' أصوات'+(v?'':'، ما في صوت عربي')+'). اضغط «اسمع السؤال»';render();done();}},2500);};
+ if(speechSynthesis.getVoices().length)go();else{let d=0;const f=()=>{if(!d++)go();};speechSynthesis.onvoiceschanged=f;setTimeout(f,1200);}}
 function hooks(m){if(rec&&listening&&((m.buzzer&&m.buzzer!==m.me)||['judging','result','ended'].includes(m.phase)))try{rec.abort();}catch(e){}
- if(m.phase==='reading'&&m.q){const k=m.code+':'+m.n;if(k!==lastQ){lastQ=k;speakQ(m.q.text);}}}
+ if(m.phase==='reading'&&m.q){const k=m.code+':'+m.n;if(k!==lastQ){lastQ=k;tts='';speakQ(m.q.text);}}}
 function listen(){if(!SR)return;try{rec=new SR();}catch(e){return;}
  rec.lang='ar-SA';rec.interimResults=true;rec.maxAlternatives=4;listening=true;
  rec.onresult=e=>{const r=e.results[e.results.length-1],t=r[0].transcript;if($('ans'))$('ans').value=t;if(r.isFinal){listening=false;tx({t:'answer',text:t,alts:Array.from(r).map(x=>x.transcript)});}};
@@ -69,7 +77,7 @@ function render(){const a=$('app'),qv=$('qs')?$('qs').value:null,av=$('ans')?$('
   <button class="g" id="lv">مغادرة الغرفة</button><div class="err">${esc(err)}</div>`;}
  else if(ph==='ended'){const r=S.players.slice().sort((a,b)=>b.score-a.score);h=`<h1>${esc(S.msg)}</h1>${r.map((p,i)=>`<div class="pl"><span>${i+1}. ${esc(p.name)}</span><b>${p.score}</b></div>`).join('')}${isH?'<button id="ag">رجوع للغرفة</button>':'<div class="mute" style="text-align:center">بانتظار صاحب الغرفة</div>'}<button class="g" id="lv">مغادرة</button>`;}
  else{const q=S.q,B=S.buzzer,bn=B?(S.players.find(p=>p.id===B)||{}).name:'';
-  h=board+`<div class="mute" style="text-align:center">سؤال ${S.n} من ${S.nq}${mine.spec?' · أنت مشاهد':''}</div><div class="card"><div class="cat">${esc(q.cat)}${q.cat?' · ':''}${esc(q.diff)}</div><div class="q">${esc(q.text)}</div></div>`;
+  h=board+`<div class="mute" style="text-align:center">سؤال ${S.n} من ${S.nq}${mine.spec?' · أنت مشاهد':''}</div><div class="card"><div class="cat">${esc(q.cat)}${q.cat?' · ':''}${esc(q.diff)}</div><div class="q">${esc(q.text)}</div></div>`+(tts?`<div class="err">${esc(tts)}</div>`:'')+(window.speechSynthesis?'<button class="g" id="rp">🔊 اسمع السؤال</button>':'');
   if(ph==='question'||ph==='reading'){h+=(mine.spec||mine.tried)?`<div class="big mute">${mine.tried?'جاوبت غلط، انتظر غيرك':'مشاهدة'}</div>`:(ph==='reading'?'<button class="bell" disabled>🔊 يُقرأ السؤال…</button>':'<button class="bell" id="bz">🔔 جرس!</button>');if(isH)h+='<button class="g" id="nx">تخطي السؤال</button>';if(S.msg)h+=`<div class="big">${esc(S.msg)}</div>`;}
   if(ph==='answering'){h+=`<div class="big">🔔 ${esc(bn)} <span id="tm"></span></div>`;
    if(B===S.me){h+=`<div class="row"><button class="g" id="hh" ${S.help||mine.helps<1||!q.hasHint?'disabled':''}>💡 تلميح</button><button class="g" id="ho" ${S.help||mine.helps<1||!q.hasOpts?'disabled':''}>📋 خيارات</button></div>`;
@@ -81,7 +89,7 @@ function render(){const a=$('app'),qv=$('qs')?$('qs').value:null,av=$('ans')?$('
   h+=`<div class="row"><button class="g" id="tg1">${pr.speak?'🔊 القراءة: شغّال':'🔇 القراءة: مطفأ'}</button>${SR?`<button class="g" id="tg2">${pr.mic?'🎤 الصوت عند الجرس: شغّال':'🎤 الصوت عند الجرس: مطفأ'}</button>`:''}</div><button class="g" id="lv">مغادرة</button>`;}
  a.innerHTML=h;if($('ans')){$('ans').value=av;$('ans').focus();}
  const on=(i,f)=>{const e=$(i);if(e)e.onclick=f;};
- on('st',()=>{tx({t:'qs',text:$('qs').value});tx({t:'start'});});on('rd',()=>tx({t:'ready'}));on('bz',()=>{tx({t:'buzz'});if(pr.mic)listen();});on('mic',()=>{if(listening)rec.abort();else listen();render();});on('tg1',()=>{pr.speak=!pr.speak;localStorage.sp=pr.speak?1:0;if(!pr.speak&&window.speechSynthesis)speechSynthesis.cancel();render();});on('tg2',()=>{pr.mic=!pr.mic;localStorage.mc=pr.mic?1:0;render();});on('nx',()=>tx({t:'next'}));on('ag',()=>tx({t:'again'}));
+ on('st',()=>{tx({t:'qs',text:$('qs').value});tx({t:'start'});});on('rd',()=>tx({t:'ready'}));on('bz',()=>{tx({t:'buzz'});if(pr.mic)listen();});on('mic',()=>{if(listening)rec.abort();else listen();render();});on('rp',()=>speakQ(S.q.text,true));on('tg1',()=>{pr.speak=!pr.speak;localStorage.sp=pr.speak?1:0;if(!pr.speak&&window.speechSynthesis)speechSynthesis.cancel();render();});on('tg2',()=>{pr.mic=!pr.mic;localStorage.mc=pr.mic?1:0;render();});on('nx',()=>tx({t:'next'}));on('ag',()=>tx({t:'again'}));
  on('hh',()=>tx({t:'help',k:'hint'}));on('ho',()=>tx({t:'help',k:'opts'}));on('vy',()=>tx({t:'vote',ok:true}));on('vn',()=>tx({t:'vote',ok:false}));
  on('sd',()=>{const v=$('ans').value.trim();if(v)tx({t:'answer',text:v});});
  on('lv',()=>{tx({t:'leave'});localStorage.removeItem('code');code='';S=null;render();});
