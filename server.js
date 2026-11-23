@@ -6,7 +6,9 @@ const wss=new WebSocketServer({server});
 const rooms={};
 // نقاط: [صح بدون مساعدة, صح مع مساعدة, خطأ بدون مساعدة, خطأ مع مساعدة]
 const PTS={'سهل':[1,0,-1,-2],'متوسط':[1,0,-1,-2],'صعب':[3,1,-1,-2]};
-const norm=s=>(s||'').replace(/[\u064B-\u065F\u0670\u0640]/g,'').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/\s+/g,' ').trim().toLowerCase();
+const norm=s=>(s||'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[\u064B-\u065F\u0670\u0640]/g,'').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[^\p{L}\p{N}\s]/gu,'').replace(/(^|\s)ال/g,'$1').replace(/\s+/g,' ').trim().toLowerCase();
+const lev=(a,b)=>{const d=[];for(let i=0;i<=a.length;i++){d[i]=[i];}for(let j=1;j<=b.length;j++)d[0][j]=j;for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[a.length][b.length];};
+const same=(a,b)=>{a=norm(a);b=norm(b);if(!a||!b)return false;if(a===b)return true;const x=a.replace(/ /g,''),y=b.replace(/ /g,'');return x===y||(x.length>=7&&y.length>=7&&lev(x,y)<=1);};
 const rid=()=>Math.random().toString(36).slice(2,10);
 const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
 function parse(text){let cat='';const out=[];
@@ -30,11 +32,13 @@ function view(R,pid){const c=R.cur,b=R.buzzer,live=R.phase!=='lobby'&&R.phase!==
     reveal:R.reveal,voted:!!(R.votes&&pid in R.votes),qtext:pid===R.host?R.qtext:undefined};}
 const bc=R=>R.order.forEach(i=>send(R.players[i].ws,view(R,i)));
 function addPlayer(R,name,ws){const id=rid();R.players[id]={name:name.slice(0,14)||'لاعب',score:0,helps:3,ready:false,ws,spec:R.phase!=='lobby'&&R.phase!=='ended'};R.order.push(id);return id;}
-function end(R,why){clearTimeout(R.timer);R.deadline=0;R.phase='ended';R.buzzer=null;
+function openBell(R){if(R.phase!=='reading')return;clearTimeout(R.readTimer);R.phase='question';bc(R);}
+function end(R,why){clearTimeout(R.timer);clearTimeout(R.readTimer);R.deadline=0;R.phase='ended';R.buzzer=null;
   const top=R.order.filter(i=>!R.players[i].left).sort((a,b)=>R.players[b].score-R.players[a].score)[0];
   R.msg=why||('🏆 الفائز: '+(top?R.players[top].name:''));bc(R);}
 function nextQ(R){if(!R.pool.length)return end(R,'انتهت الأسئلة');
-  R.cur=R.pool.pop();R.n++;R.phase='question';R.tried=new Set();R.buzzer=null;R.help=null;R.reveal='';R.said='';R.msg='';R.votes=null;R.deadline=0;bc(R);}
+  clearTimeout(R.readTimer);R.cur=R.pool.pop();R.n++;R.phase='reading';R.done=new Set();R.tried=new Set();R.buzzer=null;R.help=null;R.reveal='';R.said='';R.msg='';R.votes=null;R.deadline=0;
+  R.readTimer=setTimeout(()=>openBell(R),2000+R.cur.q.length*90);bc(R);}
 const eligible=R=>R.order.filter(i=>{const p=R.players[i];return!p.spec&&!p.left;});
 function finish(R,ok,why){clearTimeout(R.timer);R.deadline=0;
   const p=R.players[R.buzzer],d=PTS[R.cur.diff],h=!!R.help,delta=ok?(h?d[1]:d[0]):(h?d[3]:d[2]);p.score+=delta;
@@ -75,15 +79,16 @@ wss.on('connection',ws=>{
         if(!R.qs.length)return send(ws,{type:'error',msg:'أضف أسئلة أولاً'});
         if(pl.some(i=>!R.players[i].ready))return send(ws,{type:'error',msg:'لازم الكل يضغط «جاهز»'});
         pl.forEach(i=>{R.players[i].score=0;R.players[i].helps=3;});R.pool=shuffle(R.qs);R.n=0;nextQ(R);}break;
+      case'readdone':if(R.phase==='reading'){R.done.add(ws.pid);if(eligible(R).filter(i=>R.players[i].ws).every(i=>R.done.has(i)))openBell(R);}break;
       case'buzz':if(R.phase==='question'&&!P.spec&&!P.left&&!R.tried.has(ws.pid)){R.buzzer=ws.pid;R.phase='answering';R.help=null;R.deadline=Date.now()+15000;
         R.timer=setTimeout(()=>{if(R.phase==='answering')finish(R,false,'انتهى الوقت');},15000);bc(R);}break;
       case'help':if(R.phase==='answering'&&R.buzzer===ws.pid&&!R.help&&P.helps>0){
         if(m.k==='hint'&&R.cur.hint)R.help='hint';else if(m.k==='opts'&&R.cur.opts.length)R.help='opts';else break;P.helps--;bc(R);}break;
       case'answer':if(R.phase==='answering'&&R.buzzer===ws.pid){R.said=String(m.text||'').slice(0,100);
-        if(R.cur.ans){const ok=R.cur.ans.split(/[\/؛;]/).some(a=>norm(a)&&norm(a)===norm(R.said));finish(R,ok);}
+        if(R.cur.ans){const T=[R.said].concat(Array.isArray(m.alts)?m.alts.slice(0,4).map(x=>String(x).slice(0,100)):[]);const ok=R.cur.ans.split(/[\/؛;]/).some(a=>T.some(t=>same(a,t)));finish(R,ok);}
         else{clearTimeout(R.timer);R.deadline=0;R.phase='judging';R.votes={};bc(R);tally(R);}}break;
       case'vote':if(R.phase==='judging'&&ws.pid!==R.buzzer&&!P.spec&&!(ws.pid in R.votes)){R.votes[ws.pid]=!!m.ok;tally(R);}break;
-      case'next':if(isH&&(R.phase==='result'||R.phase==='question'))nextQ(R);break;
+      case'next':if(isH&&(R.phase==='result'||R.phase==='question'||R.phase==='reading'))nextQ(R);break;
       case'again':if(isH&&R.phase==='ended'){R.phase='lobby';R.msg='';R.cur=null;R.order.forEach(i=>{const p=R.players[i];p.score=0;p.helps=3;p.spec=false;p.ready=i===R.host;});bc(R);}break;
       case'leave':leave(R,ws.pid);ws.code=null;break;}
   });
