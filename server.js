@@ -8,6 +8,7 @@ const rooms={};
 const PTS={'سهل':[1,0,-1,-2],'متوسط':[1,0,-1,-2],'صعب':[3,1,-1,-2]};
 const norm=s=>(s||'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[\u064B-\u065F\u0670\u0640]/g,'').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[^\p{L}\p{N}\s]/gu,'').replace(/(^|\s)ال/g,'$1').replace(/\s+/g,' ').trim().toLowerCase();
 const lev=(a,b)=>{const d=[];for(let i=0;i<=a.length;i++){d[i]=[i];}for(let j=1;j<=b.length;j++)d[0][j]=j;for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[a.length][b.length];};
+const KWRE=/^[بوفل]?(ال)?(اجابه|اجابات|اجابت(ي|ك|ه|ها|نا|كم|هم)|اجاب|اجيب|اجوبه|جواب(ي|ك|ه|ها|نا)?|جاوب(ت|نا)?|اجاوب)$/;
 const NEG=['مش','مو','ليس','ليست','لا','غير'];
 const at=(S,P)=>{for(let i=0;i+P.length<=S.length;i++)if(P.every((w,k)=>S[i+k]===w))return true;return false;};
 const has=(a,t,opts)=>{const A=norm(a).split(' ').filter(Boolean),T=norm(t).split(' ').filter(Boolean);
@@ -29,7 +30,7 @@ function parse(text){let cat='';const out=[];
   return out;}
 const send=(ws,o)=>{if(ws&&ws.readyState===1)ws.send(JSON.stringify(o));};
 function view(R,pid){const c=R.cur,b=R.buzzer,live=R.phase!=='lobby'&&R.phase!=='ended';
-  return{type:'state',code:R.code,me:pid,host:R.host,phase:R.phase,msg:R.msg,n:R.n,nq:R.qs.length,
+  return{type:'state',ver:'2.5 مشتقات الإجابة',code:R.code,me:pid,host:R.host,phase:R.phase,msg:R.msg,n:R.n,nq:R.qs.length,
     players:R.order.map(i=>{const p=R.players[i];return{id:i,name:p.name,score:p.score,helps:p.helps,ready:p.ready,on:!!p.ws,spec:p.spec,tried:R.tried.has(i)};}),
     q:c&&live?{text:c.q,cat:c.cat,diff:c.diff,hasHint:!!c.hint,hasOpts:c.opts.length>0}:null,
     buzzer:b,left:R.deadline?Math.max(0,R.deadline-Date.now()):0,help:R.help,said:R.said,
@@ -90,10 +91,16 @@ wss.on('connection',ws=>{
       case'help':if(R.phase==='answering'&&R.buzzer===ws.pid&&!R.help&&P.helps>0){
         if(m.k==='hint'&&R.cur.hint)R.help='hint';else if(m.k==='opts'&&R.cur.opts.length)R.help='opts';else break;P.helps--;bc(R);}break;
       case'voice':if(R.phase==='answering'&&R.buzzer===ws.pid){
-        const T=[String(m.text||'')].concat(Array.isArray(m.alts)?m.alts.slice(0,4):[]).map(x=>String(x).slice(0,150));
-        if(!R.cur.ans){if(m.final&&T[0].trim()){R.said=T[0];clearTimeout(R.timer);R.deadline=0;R.phase='judging';R.votes={};bc(R);tally(R);}break;}
-        const ok=R.cur.ans.split(/[\/؛;]/).some(a=>T.some(t=>same(a,t)||has(a,t,R.cur.opts)));
-        if(ok){R.said=T[0];finish(R,true);}else if(m.final&&T[0].trim()){R.said=T[0];finish(R,false);}}break;
+        const TX=[String(m.text||'')].concat(Array.isArray(m.alts)?m.alts.slice(0,4):[]).map(x=>String(x).slice(0,600));
+        let after=null,ok=false;
+        for(const t of TX){const W=t.split(/\s+/).filter(Boolean),k=W.findIndex(w=>KWRE.test(norm(w)));if(k<0)continue;
+          const A=W.slice(k+1,k+11).join(' ');if(after===null||(!after&&A))after=A;
+          if(A&&R.cur.ans&&R.cur.ans.split(/[\/؛;]/).some(a=>same(a,A)||has(a,A,R.cur.opts)))ok=true;}
+        if(!after)break;
+        if(ok){R.said=after;finish(R,true);break;}
+        if(!(m.final||after.split(' ').length>=10))break;
+        R.said=after;
+        if(R.cur.ans)finish(R,false);else{clearTimeout(R.timer);R.deadline=0;R.phase='judging';R.votes={};bc(R);tally(R);}}break;
       case'answer':if(R.phase==='answering'&&R.buzzer===ws.pid){R.said=String(m.text||'').slice(0,100);
         if(R.cur.ans){const T=[R.said].concat(Array.isArray(m.alts)?m.alts.slice(0,4).map(x=>String(x).slice(0,100)):[]);const ok=R.cur.ans.split(/[\/؛;]/).some(a=>T.some(t=>same(a,t)||has(a,t,R.cur.opts)));finish(R,ok);}
         else{clearTimeout(R.timer);R.deadline=0;R.phase='judging';R.votes={};bc(R);tally(R);}}break;

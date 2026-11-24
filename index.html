@@ -53,8 +53,8 @@ function speakQ(t,manual){const done=()=>{if(!manual)tx({t:'readdone'});};
 function hooks(m){if(m.phase==='answering'&&m.buzzer===m.me)gotTurn=true;
  if(rec&&want&&((m.buzzer&&m.buzzer!==m.me)||(gotTurn&&!(m.phase==='answering'&&m.buzzer===m.me))))stopMic();
  if(m.phase==='reading'&&m.q){const k=m.code+':'+m.n;if(k!==lastQ){lastQ=k;tts='';speakQ(m.q.text);}}}
-let sent=false,prevT='',idle,lastV='',lastT=0,gotTurn=false,want=false,retryAt=0;
-function stopMic(){want=false;listening=false;clearTimeout(idle);try{rec&&rec.abort();}catch(e){}}
+let sent=false,thr,prevT='',idle,lastV='',lastT=0,gotTurn=false,want=false,retryAt=0;
+function stopMic(){want=false;listening=false;clearTimeout(idle);clearTimeout(thr);try{rec&&rec.abort();}catch(e){}}
 function sendVoice(texts,fin){if(sent)return;if(fin){sent=true;stopMic();}tx({t:'voice',text:texts[0],alts:texts.slice(1),final:fin});}
 function listen(more){if(!SR)return;if(!more){try{rec&&rec.abort();}catch(e){}}
  let r;try{r=new SR();}catch(e){return;}rec=r;if(!more){sent=false;prevT='';lastV='';gotTurn=false;}
@@ -64,7 +64,8 @@ function listen(more){if(!SR)return;if(!more){try{rec&&rec.abort();}catch(e){}}
   r._t=rs.map(x=>x[0].transcript).join(' ');
   const texts=Array.from(last).map(a=>(base+' '+a.transcript).trim().slice(-600));
   clearTimeout(idle);idle=setTimeout(()=>sendVoice(texts,true),1400);
-  const n=Date.now();if(texts[0]!==lastV&&n-lastT>250){lastV=texts[0];lastT=n;sendVoice(texts,false);}};
+  clearTimeout(thr);const go=()=>{lastV=texts[0];lastT=Date.now();sendVoice(texts,false);};
+  if(texts[0]!==lastV){if(Date.now()-lastT>250)go();else thr=setTimeout(go,250);}};
  r.onerror=ev=>{if(rec!==r)return;keep();
   if(['not-allowed','service-not-allowed','audio-capture'].includes(ev.error)){want=false;listening=false;err=ev.error==='audio-capture'?'ما لقيت ميكروفون':'فعّل صلاحية الميكروفون من المتصفح';if(S)render();}
   else listening=false;};
@@ -99,7 +100,7 @@ function render(){const a=$('app'),qv=$('qs')?$('qs').value:null,av=$('ans')?$('
   if(ph==='judging'){h+=`<div class="card big">${esc(bn)} جاوب: «${esc(S.said)}»</div>`;h+=(B===S.me||mine.spec)?'<div class="mute" style="text-align:center">الباقي يصوّتوا…</div>':(S.voted?'<div class="mute" style="text-align:center">تم تصويتك</div>':'<div class="row"><button class="ok" id="vy">✅ صح</button><button class="bad" id="vn">❌ غلط</button></div>');}
   if(ph==='result'){h+=`<div class="big">${esc(S.msg)}</div>${S.reveal?`<div class="card big">✅ ${esc(S.reveal)}</div>`:''}${isH?'<button id="nx">السؤال التالي</button>':'<div class="mute" style="text-align:center">بانتظار صاحب الغرفة</div>'}`;}
   h+=`<div class="row"><button class="g" id="tg1">${pr.speak?'🔊 القراءة: شغّال':'🔇 القراءة: مطفأ'}</button>${SR?`<button class="g" id="tg2">${pr.mic?'🎤 الصوت عند الجرس: شغّال':'🎤 الصوت عند الجرس: مطفأ'}</button>`:''}</div><button class="g" id="lv">مغادرة</button>`;}
- a.innerHTML=h;if($('ans')){$('ans').value=av;$('ans').focus();}
+ h+=`<div class="mute" style="text-align:center;font-size:.8rem">النسخة: واجهة 2.5 · سيرفر ${esc(S?S.ver||'قديم':'—')}</div>`;a.innerHTML=h;if($('ans')){$('ans').value=av;$('ans').focus();}
  const on=(i,f)=>{const e=$(i);if(e)e.onclick=f;};
  on('st',()=>{tx({t:'qs',text:$('qs').value});tx({t:'start'});});on('rd',()=>tx({t:'ready'}));on('bz',()=>{tx({t:'buzz'});if(pr.mic)listen();});on('clr',()=>{$('ans').value='';listen();render();});on('mic',()=>{if(want)stopMic();else listen();render();});on('rp',()=>speakQ(S.q.text,true));on('tg1',()=>{pr.speak=!pr.speak;localStorage.sp=pr.speak?1:0;if(!pr.speak&&window.speechSynthesis)speechSynthesis.cancel();render();});on('tg2',()=>{pr.mic=!pr.mic;localStorage.mc=pr.mic?1:0;render();});on('nx',()=>tx({t:'next'}));on('ag',()=>tx({t:'again'}));
  on('hh',()=>tx({t:'help',k:'hint'}));on('ho',()=>tx({t:'help',k:'opts'}));on('vy',()=>tx({t:'vote',ok:true}));on('vn',()=>tx({t:'vote',ok:false}));
