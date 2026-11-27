@@ -1,5 +1,11 @@
-const C='hakam-v1',F=['/','/manifest.webmanifest','/icon-192.png','/icon-512.png'];
-self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(F)).then(()=>self.skipWaiting()));});
-self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))).then(()=>self.clients.claim()));});
-self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;
-  e.respondWith(fetch(e.request).then(r=>{const c=r.clone();caches.open(C).then(x=>x.put(e.request,c));return r;}).catch(()=>caches.match(e.request).then(m=>m||caches.match('/'))));});
+const C='aklatna-v5';
+const CORE=["./", "./index.html", "./reveal.css", "./engine.js", "./app.js", "./manifest.json", "./icon-192.png", "./icon-512.png", "./icon.svg"];
+const IMGS=["./img/awwameh.webp", "./img/baklava.webp", "./img/bamia.webp", "./img/basbousa.webp", "./img/chard-tahini.webp", "./img/creme-caramel.webp", "./img/date-kaak.webp", "./img/dates-coffee.webp", "./img/eggplant-tray.webp", "./img/eggs-sumac.webp", "./img/falafel.webp", "./img/fattet-hummus.webp", "./img/freekeh.webp", "./img/fried-fish.webp", "./img/fries.webp", "./img/ful.webp", "./img/gaza-fatteh.webp", "./img/gaza-liver.webp", "./img/ghraybeh.webp", "./img/green-beans.webp", "./img/halva.webp", "./img/harissa.webp", "./img/harrak-osbao.webp", "./img/haytaliyeh.webp", "./img/hummus.webp", "./img/ijjeh.webp", "./img/kabsa.webp", "./img/kawareh.webp", "./img/kibbeh.webp", "./img/knafeh.webp", "./img/labneh-sandwich.webp", "./img/lentil-soup.webp", "./img/maamoul.webp", "./img/maftoul.webp", "./img/manakeesh-cheese.webp", "./img/manakeesh-zaatar.webp", "./img/mansaf.webp", "./img/maqluba-cauliflower.webp", "./img/maqluba.webp", "./img/msabbaha.webp", "./img/muhallabia.webp", "./img/mujaddara.webp", "./img/mulukhiyah.webp", "./img/musakhan.webp", "./img/mushabbak.webp", "./img/oven-chicken.webp", "./img/peas-rice.webp", "./img/pickles-grills.webp", "./img/potato-meat-tray.webp", "./img/qalayet-bandora.webp", "./img/qatayef.webp", "./img/qidra.webp", "./img/rice-chicken.webp", "./img/rice-meat.webp", "./img/rice-pudding.webp", "./img/sahlab.webp", "./img/sayadieh.webp", "./img/sfiha.webp", "./img/shakshuka.webp", "./img/shawarma.webp", "./img/shish-barak.webp", "./img/shish-tawook.webp", "./img/shrimp-zibdiyeh.webp", "./img/sliha.webp", "./img/spinach-fatayer.webp", "./img/stuffed-cabbage.webp", "./img/stuffed-eggplant.webp", "./img/stuffed-zucchini.webp", "./img/sumagiyya.webp", "./img/sweet-pumpkin.webp", "./img/vegetable-soup.webp", "./img/warak-enab.webp", "./img/zaatar-bread.webp"];
+self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(CORE).then(()=>c.addAll(IMGS).catch(()=>{}))));self.skipWaiting()});
+self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))));self.clients.claim()});
+self.addEventListener('fetch',e=>{
+  if(e.request.method!=='GET')return;
+  e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).then(res=>{
+    if(res&&(res.ok||res.type==='opaque')){const cp=res.clone();caches.open(C).then(c=>c.put(e.request,cp))}
+    return res}).catch(()=>caches.match('./index.html'))))
+});

@@ -1,114 +1,657 @@
-<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>الحكم الإلكتروني</title>
-<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#0f6b5c"><link rel="apple-touch-icon" href="/icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="الحكم">
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F4EDE0">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>أكلتنا</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@700&family=Cairo:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="reveal.css">
 <style>
-:root{--bg:#f3efe6;--card:#fffdf8;--ink:#1d2a2a;--mute:#6b7773;--acc:#0f6b5c;--line:#d9d2c3;--bad:#c0392b;--ok:#1e8e5a;color-scheme:light dark}
-@media(prefers-color-scheme:dark){:root{--bg:#14201f;--card:#1c2c2a;--ink:#f1ede2;--mute:#9db0ab;--acc:#4fc3a8;--line:#33504b}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Cairo,"Segoe UI",Tahoma,Arial,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
-main{max-width:720px;margin:0 auto;padding:14px;display:flex;flex-direction:column;gap:12px}
-h1{margin:6px 0;font-size:1.5rem}.mute{color:var(--mute)}.err{color:var(--bad);min-height:1.3em;text-align:center}
-input,textarea{font:inherit;font-size:1.1rem;padding:12px;border-radius:12px;border:2px solid var(--line);background:var(--card);color:var(--ink);width:100%}
-textarea{min-height:200px;line-height:1.7}
-button{font:inherit;font-weight:700;font-size:1.1rem;padding:14px 18px;border:0;border-radius:14px;background:var(--acc);color:var(--bg);cursor:pointer}
-button.g{background:transparent;color:var(--ink);border:2px solid var(--line)}button.bad{background:var(--bad);color:#fff}button.ok{background:var(--ok);color:#fff}button:disabled{opacity:.45}
-.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1}
-.card{background:var(--card);border:2px solid var(--line);border-radius:16px;padding:14px}
-.code{font-size:2.4rem;letter-spacing:.3rem;text-align:center;font-weight:800;color:var(--acc)}
-.pl{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border:2px solid var(--line);border-radius:12px;background:var(--card)}
-.pl.me{border-color:var(--acc)}.pl.buz{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc)}.pl.off{opacity:.5}.pl b{font-size:1.5rem;color:var(--acc)}
-.sb{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
-.q{text-align:center;font-size:clamp(1.5rem,5.5vw,2.4rem);font-weight:700;line-height:1.5;min-height:140px;display:flex;align-items:center;justify-content:center}
-.cat{align-self:center;background:var(--acc);color:var(--bg);padding:4px 16px;border-radius:99px;font-weight:700}
-.bell{font-size:2rem;padding:30px;width:100%}.big{font-size:2.4rem;text-align:center;font-weight:800}
-.chip{border-radius:99px;background:var(--card);color:var(--ink);border:2px solid var(--acc)}
-</style></head><body><main id="app"></main>
-<script>
-let inst=null;addEventListener('beforeinstallprompt',e=>{e.preventDefault();inst=e;if(!S)render();});
-if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
-let ws,S=null,me=localStorage.pid||'',code=localStorage.code||'',err='',dl=0,prev={};
-const $=id=>document.getElementById(id),esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-function tx(o){if(ws&&ws.readyState===1)ws.send(JSON.stringify(o));else{err='جاري الاتصال… جرب بعد ثانية';render();}}
-function connect(){ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
- ws.onopen=()=>{if(code&&me)tx({t:'join',code,pid:me,name:localStorage.name||''});};
- ws.onmessage=e=>{const m=JSON.parse(e.data);
-  if(m.type==='error'){err=m.msg;if(m.fatal){localStorage.removeItem('code');code='';S=null;}render();return;}
-  if(m.type==='joined'){me=m.pid;code=m.code;localStorage.pid=me;localStorage.code=code;return;}
-  sound(m);hooks(m);S=m;err='';dl=Date.now()+m.left;render();};
- ws.onclose=()=>setTimeout(connect,1500);}
-setInterval(()=>tx({t:'ping'}),25000);
-let pr={speak:localStorage.sp!=='0',mic:localStorage.mc!=='0'},listening=false,rec,lastQ='';
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-if(window.speechSynthesis)speechSynthesis.getVoices();
-let tts='';
-const getAr=()=>window.speechSynthesis?speechSynthesis.getVoices().find(v=>/^ar/i.test(v.lang)):null;
-function speakQ(t,manual){const done=()=>{if(!manual)tx({t:'readdone'});};
- if(!window.speechSynthesis){tts='متصفحك ما بيدعم القراءة الصوتية';render();done();return;}
- if(!pr.speak&&!manual){setTimeout(done,300);return;}
- const go=()=>{const v=getAr(),n=speechSynthesis.getVoices().length,u=new SpeechSynthesisUtterance(t);let started=false;
-  u.lang='ar-SA';if(v)u.voice=v;u.rate=.95;
-  u.onstart=()=>{started=true;tts='';render();};u.onend=done;
-  u.onerror=ev=>{tts='تعذّر تشغيل الصوت ('+ev.error+'، '+n+' أصوات). اضغط «اسمع السؤال»';render();done();};
-  try{if(speechSynthesis.speaking||speechSynthesis.pending)speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){done();return;}
-  setTimeout(()=>{if(!started){tts='الصوت ما بدأ ('+n+' أصوات'+(v?'':'، ما في صوت عربي')+'). اضغط «اسمع السؤال»';render();done();}},2500);};
- if(speechSynthesis.getVoices().length)go();else{let d=0;const f=()=>{if(!d++)go();};speechSynthesis.onvoiceschanged=f;setTimeout(f,1200);}}
-function hooks(m){if(m.phase==='answering'&&m.buzzer===m.me)gotTurn=true;
- if(rec&&want&&((m.buzzer&&m.buzzer!==m.me)||(gotTurn&&!(m.phase==='answering'&&m.buzzer===m.me))))stopMic();
- if(m.phase==='reading'&&m.q){const k=m.code+':'+m.n;if(k!==lastQ){lastQ=k;tts='';speakQ(m.q.text);}}}
-let sent=false,thr,prevT='',idle,lastV='',lastT=0,gotTurn=false,want=false,retryAt=0;
-function stopMic(){want=false;listening=false;clearTimeout(idle);clearTimeout(thr);try{rec&&rec.abort();}catch(e){}}
-let heard='';function sendVoice(texts,fin){heard=texts[0]||'';const e=$('heard');if(e)e.textContent=heard?'🎧 سمعت: '+heard:'';tx({t:'voice',text:texts[0],alts:texts.slice(1),final:fin});}
-function listen(more){if(!SR)return;if(!more){try{rec&&rec.abort();}catch(e){}}
- let r;try{r=new SR();}catch(e){return;}rec=r;if(!more){sent=false;prevT='';lastV='';gotTurn=false;heard='';}
- want=true;r.lang='ar-SA';r.continuous=true;r.interimResults=true;r.maxAlternatives=3;listening=true;
- const keep=()=>{prevT=(prevT+' '+(r._t||'')).trim().slice(-500);r._t='';};
- r.onresult=ev=>{if(rec!==r||sent)return;const rs=Array.from(ev.results),last=rs[rs.length-1],base=(prevT+' '+rs.slice(0,-1).map(x=>x[0].transcript).join(' ')).trim();
-  r._t=rs.map(x=>x[0].transcript).join(' ');
-  const texts=Array.from(last).map(a=>(base+' '+a.transcript).trim().slice(-600));
-  clearTimeout(idle);idle=setTimeout(()=>sendVoice(texts,true),1400);
-  clearTimeout(thr);const go=()=>{lastV=texts[0];lastT=Date.now();sendVoice(texts,false);};
-  if(texts[0]!==lastV){if(Date.now()-lastT>250)go();else thr=setTimeout(go,250);}};
- r.onerror=ev=>{if(rec!==r)return;keep();
-  if(['not-allowed','service-not-allowed','audio-capture'].includes(ev.error)){want=false;listening=false;err=ev.error==='audio-capture'?'ما لقيت ميكروفون':'فعّل صلاحية الميكروفون من المتصفح';if(S)render();}
-  else listening=false;};
- r.onend=()=>{if(rec!==r)return;keep();listening=false;};
- try{r.start();}catch(e){listening=false;}}
-let ac;function tone(f,t,d){try{ac=ac||new AudioContext();const o=ac.createOscillator(),g=ac.createGain(),n=ac.currentTime+t;o.type='triangle';o.frequency.value=f;g.gain.setValueAtTime(.25,n);g.gain.exponentialRampToValueAtTime(.001,n+d);o.connect(g);g.connect(ac.destination);o.start(n);o.stop(n+d);}catch(e){}}
-function sound(m){if(m.buzzer&&m.buzzer!==prev.b)tone(880,0,.3);
- if(m.msg&&m.msg!==prev.m){if(m.msg.includes('✅'))[523,659,784].forEach((f,i)=>tone(f,i*.12,.25));else if(m.msg.includes('❌')){tone(190,0,.3);tone(130,.25,.4);}else if(m.msg.includes('🏆'))[523,659,784,1047,1319].forEach((f,i)=>tone(f,i*.14,.3));}
- prev={b:m.buzzer,m:m.msg};}
-const SAMPLE='# معلومات عامة\nما هي عاصمة فرنسا؟ | تلميح: فيها برج مشهور | خيارات: باريس، روما، مدريد | إجابة: باريس | صعوبة: سهل\nمن اخترع المصباح الكهربائي؟ | تلميح: أمريكي | خيارات: إديسون، نيوتن، تسلا | إجابة: إديسون / توماس إديسون | صعوبة: متوسط\n# أرقام\nكم عدد أيام السنة الكبيسة؟ | تلميح: أكثر من العادية بيوم | خيارات: 365، 366، 364 | إجابة: 366 | صعوبة: صعب';
-function render(){const a=$('app'),qv=$('qs')?$('qs').value:null,av=$('ans')?$('ans').value:'',nm=$('nm')?$('nm').value:'',cd=$('cd')?$('cd').value:'';
- if(!S){a.innerHTML=`<h1>🔔 الحكم الإلكتروني</h1><div class="card"><input id="nm" maxlength="14" placeholder="اسمك" value="${esc(nm||localStorage.name||'')}"></div>
- <button id="cr">إنشاء غرفة جديدة</button><div class="card row"><input id="cd" inputmode="numeric" maxlength="4" placeholder="رمز الغرفة" value="${esc(cd)}"><button id="jn" class="g">دخول</button></div><div class="err">${esc(err)}</div>${inst?'<button class="g" id="ins">📲 ثبّت اللعبة كتطبيق</button>':(/iphone|ipad/i.test(navigator.userAgent)&&!navigator.standalone?'<div class="mute" style="text-align:center">للتثبيت على الآيفون: زر المشاركة ثم «إضافة إلى الشاشة الرئيسية»</div>':'')}`;
-  const nmv=()=>{const v=$('nm').value.trim();if(!v){err='اكتب اسمك أولاً';render();return null;}localStorage.name=v;return v;};
-  if($('ins'))$('ins').onclick=async()=>{inst.prompt();await inst.userChoice;inst=null;render();};
-  $('cr').onclick=()=>{const v=nmv();if(v)tx({t:'create',name:v});};$('jn').onclick=()=>{const v=nmv();if(v)tx({t:'join',code:$('cd').value.trim(),name:v});};return;}
- const isH=S.me===S.host,mine=S.players.find(p=>p.id===S.me)||{},ph=S.phase;
- const board=`<div class="sb">${S.players.map(p=>`<div class="pl ${p.id===S.me?'me':''} ${p.id===S.buzzer?'buz':''} ${p.on?'':'off'}"><span>${esc(p.name)}${p.id===S.host?' 👑':''}${p.spec?' 👁':''}${ph==='lobby'?(p.ready?' ✅':''):' <small class="mute">💡'+p.helps+'</small>'}</span>${ph==='lobby'?'':'<b>'+p.score+'</b>'}</div>`).join('')}</div>`;
- let h=`<div class="err">${esc(err)}</div>`;
- if(ph==='lobby'){h=`<h1>🔔 الغرفة</h1><div class="card"><div class="mute" style="text-align:center">رمز الغرفة (والرابط نفسه للأصدقاء)</div><div class="code">${esc(S.code)}</div></div>${board}
-  ${isH?`<textarea id="qs" placeholder="الأسئلة">${esc(qv!==null?qv:(S.qtext||SAMPLE))}</textarea><div class="mute">فيه صيغة: # فئة، وبعدها سؤال | تلميح: | خيارات: | إجابة: | صعوبة: سهل/متوسط/صعب</div><button id="st">ابدأ المباراة</button>`:`<button id="rd" class="${mine.ready?'g':''}">${mine.ready?'إلغاء الجاهزية':'جاهز ✅'}</button><div class="mute" style="text-align:center">بانتظار صاحب الغرفة…</div>`}
-  <button class="g" id="lv">مغادرة الغرفة</button><div class="err">${esc(err)}</div>`;}
- else if(ph==='ended'){const r=S.players.slice().sort((a,b)=>b.score-a.score);h=`<h1>${esc(S.msg)}</h1>${r.map((p,i)=>`<div class="pl"><span>${i+1}. ${esc(p.name)}</span><b>${p.score}</b></div>`).join('')}${isH?'<button id="ag">رجوع للغرفة</button>':'<div class="mute" style="text-align:center">بانتظار صاحب الغرفة</div>'}<button class="g" id="lv">مغادرة</button>`;}
- else{const q=S.q,B=S.buzzer,bn=B?(S.players.find(p=>p.id===B)||{}).name:'';
-  h=board+`<div class="mute" style="text-align:center">سؤال ${S.n} من ${S.nq}${mine.spec?' · أنت مشاهد':''}</div><div class="card"><div class="cat">${esc(q.cat)}${q.cat?' · ':''}${esc(q.diff)}</div><div class="q">${esc(q.text)}</div></div>`+(tts?`<div class="err">${esc(tts)}</div>`:'')+(window.speechSynthesis?'<button class="g" id="rp">🔊 اسمع السؤال</button>':'');
-  if(ph==='question'||ph==='reading'){h+=(mine.spec||mine.tried)?`<div class="big mute">${mine.tried?'جاوبت غلط، انتظر غيرك':'مشاهدة'}</div>`:(ph==='reading'?'<button class="bell" disabled>🔊 يُقرأ السؤال…</button>':'<button class="bell" id="bz">🔔 جرس!</button>');if(isH)h+='<button class="g" id="nx">تخطي السؤال</button>';if(S.msg)h+=`<div class="big">${esc(S.msg)}</div>`;}
-  if(ph==='answering'){h+=`<div class="big">🔔 ${esc(bn)} <span id="tm"></span></div>`;
-   if(B===S.me){h+=`<div class="row"><button class="g" id="hh" ${S.help||mine.helps<1||!q.hasHint?'disabled':''}>💡 تلميح</button><button class="g" id="ho" ${S.help||mine.helps<1||!q.hasOpts?'disabled':''}>📋 خيارات</button></div>`;
-    if(S.hint)h+=`<div class="card big">💡 ${esc(S.hint)}</div>`;
-    if(S.opts)h+=`<div class="row">${S.opts.map((o,i)=>`<button class="chip" data-o="${i}">${esc(o)}</button>`).join('')}</div>`;
-    h+='<div class="mute" style="text-align:center">احكي بحرية، وجوابك لازم يبدأ بكلمة «الإجابة…». أو اكتبه، وأي وحدة صح بتنحسب</div><div class="row"><input id="ans" placeholder="اكتب جوابك" autocomplete="off"><button id="sd" style="flex:0 0 auto">إرسال</button></div>'+(SR?'<div class="mute" id="heard" style="text-align:center;min-height:1.4em">'+(heard?'🎧 سمعت: '+esc(heard):'')+'</div><button class="g" id="mic">🎤 '+(want?'المايك شغّال (اضغط للإيقاف)':'جاوب بصوتك')+'</button>':'');}}
-  if(ph==='judging'){h+=`<div class="card big">${esc(bn)} جاوب: «${esc(S.said)}»</div>`;h+=(B===S.me||mine.spec)?'<div class="mute" style="text-align:center">الباقي يصوّتوا…</div>':(S.voted?'<div class="mute" style="text-align:center">تم تصويتك</div>':'<div class="row"><button class="ok" id="vy">✅ صح</button><button class="bad" id="vn">❌ غلط</button></div>');}
-  if(ph==='result'){h+=`<div class="big">${esc(S.msg)}</div>${S.reveal?`<div class="card big">✅ ${esc(S.reveal)}</div>`:''}${isH?'<button id="nx">السؤال التالي</button>':'<div class="mute" style="text-align:center">بانتظار صاحب الغرفة</div>'}`;}
-  h+=`<div class="row"><button class="g" id="tg1">${pr.speak?'🔊 القراءة: شغّال':'🔇 القراءة: مطفأ'}</button>${SR?`<button class="g" id="tg2">${pr.mic?'🎤 الصوت عند الجرس: شغّال':'🎤 الصوت عند الجرس: مطفأ'}</button>`:''}</div><button class="g" id="lv">مغادرة</button>`;}
- h+=`<div class="mute" style="text-align:center;font-size:.8rem">النسخة: واجهة 2.6 · سيرفر ${esc(S?S.ver||'قديم':'—')}</div>`;a.innerHTML=h;if($('ans')){$('ans').value=av;$('ans').focus();}
- const on=(i,f)=>{const e=$(i);if(e)e.onclick=f;};
- on('st',()=>{tx({t:'qs',text:$('qs').value});tx({t:'start'});});on('rd',()=>tx({t:'ready'}));on('bz',()=>{tx({t:'buzz'});if(pr.mic)listen();});on('clr',()=>{$('ans').value='';listen();render();});on('mic',()=>{if(want)stopMic();else listen();render();});on('rp',()=>speakQ(S.q.text,true));on('tg1',()=>{pr.speak=!pr.speak;localStorage.sp=pr.speak?1:0;if(!pr.speak&&window.speechSynthesis)speechSynthesis.cancel();render();});on('tg2',()=>{pr.mic=!pr.mic;localStorage.mc=pr.mic?1:0;render();});on('nx',()=>tx({t:'next'}));on('ag',()=>tx({t:'again'}));
- on('hh',()=>tx({t:'help',k:'hint'}));on('ho',()=>tx({t:'help',k:'opts'}));on('vy',()=>tx({t:'vote',ok:true}));on('vn',()=>tx({t:'vote',ok:false}));
- on('sd',()=>{stopMic();const v=$('ans').value.trim();if(v)tx({t:'answer',text:v});});
- on('lv',()=>{tx({t:'leave'});localStorage.removeItem('code');code='';S=null;render();});
- if($('ans'))$('ans').onkeydown=e=>{if(e.key==='Enter'){stopMic();const v=$('ans').value.trim();if(v)tx({t:'answer',text:v});}};
- document.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>tx({t:'answer',text:b.textContent}));}
-setInterval(()=>{if(want&&!sent&&!listening&&S&&S.phase==='answering'&&S.buzzer===S.me&&Date.now()>retryAt){retryAt=Date.now()+500;listen(true);}
-const t=$('tm');if(t&&S&&S.phase==='answering')t.textContent='⏱ '+Math.max(0,Math.ceil((dl-Date.now())/1000));},250);
-connect();render();
-</script></body></html>
+/* layout: phone column — header, tomorrow's three meal cards, week strip, our dishes grid, fixed bottom nav; reveal opens as a full-screen sheet */
+:root{
+  --paper:#F4EDE0; --card:#FBF7EF; --ink:#4A3426; --soft:#7E6553; --line:#E6D8C2;
+  --lunch:#5E7A36; --dinner:#C2632A; --sweet:#B04F74; --gold:#C9962E;
+  --ui:"Cairo",Tahoma,"Segoe UI",sans-serif; --dish:"Aref Ruqaa","Traditional Arabic",serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font:500 15px/1.6 var(--ui);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-top:calc(16px + env(safe-area-inset-top,0px));padding-bottom:calc(92px + env(safe-area-inset-bottom,0px))}
+main{max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.top h1{margin:0;font-family:var(--dish);font-size:38px;line-height:1.05}
+.top p{margin:2px 0 0;color:var(--soft);font-size:14px;font-weight:600}
+.plus{width:48px;height:48px;border-radius:50%;border:2px solid var(--ink);background:var(--card);font-size:26px;font-weight:800;line-height:1;flex:0 0 auto}
+.today{display:flex;gap:8px;align-items:center;background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:8px 12px;font-size:13.5px;font-weight:700;overflow-x:auto;scrollbar-width:none}
+.today[hidden],#revealSheet[hidden]{display:none}
+.today b{color:var(--soft);font-weight:700;white-space:nowrap}
+.today span{white-space:nowrap}
+h2.sec{margin:0 0 -8px;font-size:18px;font-weight:800;display:flex;justify-content:space-between;align-items:baseline}
+h2.sec small{font-size:13px;color:var(--soft);font-weight:600}
+.meals{display:flex;flex-direction:column;gap:12px}
+.meal{position:relative;display:grid;grid-template-columns:108px minmax(0,1fr);gap:14px;align-items:center;background:var(--card);border:1.5px solid var(--line);border-radius:24px;padding:12px 14px 12px 12px;--c:var(--lunch)}
+.meal[data-t="dinner"]{--c:var(--dinner)}.meal[data-t="sweet"]{--c:var(--sweet)}
+.meal::before{content:"";position:absolute;inset-block:16px;right:-1.5px;width:5px;border-radius:0 6px 6px 0;background:var(--c);display:none}
+.mpic{width:108px;height:108px;border-radius:20px;background:#fff;display:grid;place-items:center;overflow:hidden;border:1.5px solid var(--line)}
+.mpic img{width:100%;height:100%;object-fit:contain}
+.mpic .emo{font-size:52px}
+.mbody{min-width:0;display:flex;flex-direction:column;gap:4px}
+.kick{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:800;color:var(--c)}
+.kick i{width:9px;height:9px;border-radius:50%;background:var(--c)}
+.mname{margin:0;font-family:var(--dish);font-size:27px;line-height:1.2;overflow-wrap:anywhere}
+.mname.wait{font-family:var(--ui);font-size:15px;font-weight:700;color:var(--soft)}
+.sides{display:flex;flex-wrap:wrap;gap:6px}
+.side{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1.5px solid var(--line);border-radius:999px;padding:2px 10px 2px 4px;font-size:13px;font-weight:700}
+.side img{width:26px;height:26px;object-fit:contain}
+.side .emo{font-size:18px}
+.go{margin-top:4px;border:0;border-radius:14px;background:var(--c);color:#fff;font-weight:800;font-size:16px;padding:10px 14px;box-shadow:0 4px 0 color-mix(in srgb,var(--c) 60%,#000);transition:transform .08s,box-shadow .08s}
+.go:active:not(:disabled){transform:translateY(3px);box-shadow:0 1px 0 color-mix(in srgb,var(--c) 60%,#000)}
+.go:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+.mnote{font-size:12.5px;color:var(--soft);font-weight:600}
+.lnk{border:0;background:none;padding:0;color:var(--c);font-weight:800;font-size:13px;text-decoration:underline;text-underline-offset:4px;align-self:flex-start}
+.mrow{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.week{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;scrollbar-width:none;margin-inline:-2px}
+.week::-webkit-scrollbar,.chips::-webkit-scrollbar,.today::-webkit-scrollbar{display:none}
+.day{flex:0 0 auto;width:74px;background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:8px 4px;text-align:center}
+.day b{display:block;font-size:12.5px;color:var(--soft)}
+.day span{display:block;font-size:20px;font-weight:900;line-height:1.3}
+.day .th{display:flex;justify-content:center;gap:1px;min-height:26px}
+.day .th img{width:24px;height:24px;object-fit:contain}
+.day.tom{border-color:var(--ink);background:#fff}
+.log{margin:0;padding:0;list-style:none;background:var(--card);border:1.5px solid var(--line);border-radius:18px}
+.log li{padding:10px 14px;border-bottom:1px solid var(--line);font-size:14px}
+.log li:last-child{border:0}
+.log .rs{display:block;font-size:12.5px;color:var(--soft)}
+.chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.chip{flex:0 0 auto;border:1.5px solid var(--line);background:var(--card);border-radius:999px;padding:4px 16px;font-weight:700;font-size:14px}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--card)}
+.add-cat{border:1.5px dashed var(--soft);background:transparent;border-radius:16px;padding:10px;font-weight:800;color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.tile{border:1.5px solid var(--line);background:var(--card);border-radius:18px;padding:6px 6px 8px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:2px}
+.tile .tp{width:100%;aspect-ratio:1;display:grid;place-items:center;max-width:100%}
+.tile .tp img{width:100%;height:100%;object-fit:contain}
+.tile .tp .emo{font-size:40px}
+.tile b{font-size:13px;line-height:1.3;font-weight:800}
+.tile small{font-size:11px;color:var(--soft);font-weight:700}
+.empty{grid-column:1/-1;text-align:center;color:var(--soft);border:2px dashed var(--line);border-radius:18px;padding:22px 12px;font-weight:600}
+nav.bar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:center;gap:4px;background:var(--card);border-top:1.5px solid var(--line);
+  padding:8px max(12px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+nav.bar a{flex:1;max-width:140px;text-align:center;text-decoration:none;color:var(--soft);font-size:13px;font-weight:800}
+nav.bar a span{display:block;font-size:21px;line-height:1.25}
+dialog{border:0;border-radius:24px;padding:20px;width:min(92vw,440px);background:var(--card);color:var(--ink);font-family:var(--ui)}
+dialog::backdrop{background:rgba(40,25,15,.55)}
+dialog h3{margin:0 0 8px;font-size:19px;font-weight:800}
+dialog label{display:block;margin:12px 0 6px;font-weight:800;font-size:14px}
+dialog input[type=text],dialog select,dialog textarea{font:inherit;width:100%;padding:11px 12px;border-radius:12px;border:1.5px solid var(--line);background:#fff;color:var(--ink)}
+.photo{height:130px;border-radius:16px;border:2px dashed var(--line);display:grid;place-items:center;color:var(--soft);cursor:pointer;overflow:hidden;font-weight:700}
+.photo img{width:100%;height:100%;object-fit:contain}
+.acts{display:flex;gap:8px;margin-top:16px}
+.acts button{flex:1;border:0;border-radius:14px;padding:12px;font-weight:800;background:var(--ink);color:var(--card)}
+.acts .ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+.acts .del{flex:0 0 auto;background:transparent;color:#A8322F;border:1.5px solid #A8322F}
+.err{color:#A8322F;font-size:13px;font-weight:700;min-height:1em;margin-top:6px}
+.catlist{max-height:52vh;overflow:auto;margin-top:6px}
+.catlist h4{margin:12px 0 4px;font-size:14px;color:var(--soft)}
+.crow{display:flex;align-items:center;gap:10px;padding:5px 2px;border-bottom:1px solid var(--line);font-weight:700}
+.crow input{width:20px;height:20px;accent-color:var(--ink);flex:0 0 auto}
+.crow img{width:38px;height:38px;object-fit:contain}
+.crow.has{opacity:.5}
+.crow small{margin-inline-start:auto;color:var(--soft);font-size:11.5px;font-weight:600}
+/* reveal sheet */
+#revealSheet{position:fixed;inset:0;z-index:50;background:radial-gradient(circle at 50% 30%,#FDF8EE,#F1E4CC);overflow:auto;
+  padding:calc(12px + env(safe-area-inset-top,0px)) 0 calc(16px + env(safe-area-inset-bottom,0px))}
+#revealSheet .shwrap{max-width:480px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;justify-content:center;gap:10px}
+#revealSheet .shtop{display:flex;align-items:center;gap:10px;padding:0 max(14px,env(safe-area-inset-right,0px)) 0 max(14px,env(safe-area-inset-left,0px))}
+#revealSheet .shtop .ttl{flex:1;min-width:0}
+#revealSheet .shtop b{display:block;font-size:20px;font-weight:900;color:var(--ink)}
+#revealSheet .shtop small{display:block;font-size:12.5px;font-weight:700;color:var(--soft)}
+#revealSheet .round{width:42px;height:42px;border-radius:50%;border:1.5px solid var(--line);background:#fff;font-size:18px;font-weight:900;display:grid;place-items:center;flex:0 0 auto}
+#revealSheet #stage{height:360px}
+#revealSheet .shact{padding:0 14px}
+#revealSheet #resDishSvg{width:160px;height:140px}
+.res-img{width:100%;height:100%;object-fit:contain}
+.res-emo{font-size:64px;line-height:1}
+.res-sides{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:4px}
+.res-sides span{display:inline-flex;align-items:center;gap:4px;background:#FDF6E3;border:1px solid #F3E2C7;border-radius:999px;padding:1px 9px 1px 3px;font-size:12px;font-weight:800;color:#78350f}
+.res-sides img{width:24px;height:24px;object-fit:contain}
+.dv-img{object-fit:contain;display:block}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.go{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <header class="top" id="top">
+    <div><h1>أكلتنا</h1><p id="sub"></p></div>
+    <button class="plus" id="addBtn" type="button" aria-label="إضافة أكلة">+</button>
+  </header>
+
+  <div class="today" id="todayRow" hidden></div>
+
+  <section class="meals" id="meals" aria-label="أكلات بكرا"></section>
+
+  <section id="days">
+    <h2 class="sec">الأيام الجاية</h2>
+    <div class="week" id="week" style="margin-top:14px"></div>
+    <ul class="log" id="log"></ul>
+  </section>
+
+  <section id="foods" style="display:flex;flex-direction:column;gap:12px">
+    <h2 class="sec" style="margin:0">أكلاتنا <small id="count"></small></h2>
+    <button class="add-cat" id="catBtn" type="button">+ أضف من أكلات المنطقة</button>
+    <div class="chips" id="chips"></div>
+    <div class="grid" id="grid"></div>
+  </section>
+</main>
+
+<nav class="bar">
+  <a href="#top"><span>🍽️</span>بكرا</a>
+  <a href="#foods"><span>🍲</span>أكلاتنا</a>
+  <a href="#days"><span>📅</span>الأيام</a>
+</nav>
+
+<!-- reveal sheet: hosts the 21-method stage -->
+<div id="revealSheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <div class="shwrap">
+    <div class="shtop">
+      <button class="round" id="sheetClose" type="button" aria-label="إغلاق">✕</button>
+      <div class="ttl"><b id="sheetTitle"></b><small id="sheetMode"></small></div>
+      <button class="round" id="soundToggleBtn" type="button" aria-label="الصوت"><span id="soundIcon">🔊</span></button>
+    </div>
+        <section id="stage" class="relative h-[310px] mx-3.5 my-1 rounded-[1.8rem] bg-gradient-to-b from-[#fdf6e3] to-[#f5e1c3] border-2 border-[#ebd5b7] flex flex-col items-center justify-center overflow-hidden shadow-inner">
+
+      <!-- أشعة الشمس الدوارة خلف النتيجة -->
+      <div id="sunbeams" class="sunbeams"></div>
+
+      <!-- طبقات المؤثرات العليا (زينة، انفجار، فلاش) -->
+      <div id="garnishLayer" class="absolute inset-0 pointer-events-none z-40"></div>
+      <div id="burstLayer" class="absolute inset-0 pointer-events-none z-40"></div>
+      <div id="flashLayer" class="hidden absolute inset-0 bg-white pointer-events-none z-50"></div>
+
+      <!-- شريط التلميح العلوي -->
+      <div id="stageHint" class="absolute top-2.5 z-30 text-[11px] font-extrabold text-[#78350f] bg-white/92 backdrop-blur-sm px-3.5 py-1 rounded-full border border-[#f3e2c7] shadow-sm text-center max-w-[92%]">
+        امسح القصدير بإصبعك أو اضغط مطولاً لكشف الطبق! 🪙
+      </div>
+
+      <!-- =========================================================
+           بطاقة النتيجة النهائية (تُستخدم تحت الأغطية أو تظهر عند الكشف)
+           ========================================================= -->
+      <div id="revealCard" class="hidden relative z-10 flex flex-col items-center text-center px-2">
+        <div class="relative overflow-hidden bg-white/95 backdrop-blur-md border-4 border-[#f59e0b] rounded-[1.75rem] p-3.5 shadow-[0_18px_38px_rgba(180,83,9,0.28)] w-64">
+          <!-- شريط اللمعة الذهبية -->
+          <div id="goldenSweep" class="hidden absolute inset-y-0 w-16 bg-gradient-to-r from-transparent via-amber-200/85 to-transparent pointer-events-none"></div>
+
+          <div class="flex items-center justify-center gap-1.5 mb-1">
+            <span id="resCategoryBadge" class="inline-block text-[10px] font-black px-2.5 py-0.5 rounded-full bg-[#fef3c7] text-[#b45309] border border-[#fde68a]">
+              غداء وطبيخ 🍛
+            </span>
+            <span id="resIngredientsMini" class="text-xs bg-[#fdf6e3] px-2 py-0.5 rounded-full border border-[#f3e2c7]">
+              🍆🍚🍗
+            </span>
+          </div>
+
+          <!-- رسم SVG مخصص للطبق -->
+          <div id="resDishSvg" class="w-32 h-22 mx-auto my-0.5 flex items-center justify-center"></div>
+
+          <h2 id="resDishTitle" class="text-xl sm:text-2xl font-black text-[#4a2c18] mt-0.5">مقلوبة</h2>
+          <p id="resDishDesc" class="text-[11px] font-bold text-[#78350f] mt-0.5 leading-snug">
+            طبقات الرز والباذنجان والدجاج المحمّر!
+          </p>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           1. كشط القصدير أو ورق الزبدة الساخن (Foil Scratch)
+           ========================================================= -->
+      <div id="scene-foil" class="mode-scene hidden absolute inset-0 z-20 flex items-center justify-center">
+        <div id="foilWrapper" class="relative w-64 h-56 rounded-[1.75rem] overflow-hidden shadow-xl border-4 border-[#cbd5e1] cursor-crosshair touch-none">
+          <canvas id="foilCanvas" class="w-full h-full block"></canvas>
+          <div id="foilProgressPill" class="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/65 text-white text-[10px] font-black px-3 py-0.5 rounded-full pointer-events-none">
+            مكشوط: <span id="foilPercent">0</span>%
+          </div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           2. شعلة الموقد والغليان السحري (Stove Flame & Bubble)
+           ========================================================= -->
+      <div id="scene-flame" class="mode-scene hidden relative z-20 w-full h-full flex flex-col items-center justify-center">
+        <div class="relative w-64 h-60 flex items-center justify-center">
+          <div class="absolute inset-4 rounded-full border-4 border-dashed border-amber-400/60"></div>
+          <div id="bubblesContainer" class="absolute inset-0 z-20"></div>
+          <div id="stoveFlameBox" onclick="energizeFlame()" class="relative z-10 flex flex-col items-center justify-center cursor-pointer transition-transform duration-200" style="transform: scale(0.85);">
+            <svg width="120" height="130" viewBox="0 0 130 140" class="overflow-visible">
+              <rect x="25" y="114" width="80" height="14" rx="7" fill="#334155" stroke="#4a2c18" stroke-width="3.5"/>
+              <rect x="40" y="106" width="50" height="10" rx="4" fill="#64748b" stroke="#4a2c18" stroke-width="3"/>
+              <path d="M65 20 C35 55, 28 88, 45 106 L85 106 C102 88, 95 55, 65 20 Z" fill="#f97316" stroke="#4a2c18" stroke-width="3.5" class="flame-dance"/>
+              <path d="M65 42 C46 66, 42 90, 53 106 L77 106 C88 90, 84 66, 65 42 Z" fill="#facc15" class="flame-dance"/>
+              <path d="M65 72 C56 84, 54 96, 60 106 L70 106 C76 96, 74 84, 65 72 Z" fill="#38bdf8"/>
+            </svg>
+            <span id="flamePowerText" class="text-[11px] font-black text-orange-700 bg-amber-100/95 px-2.5 py-0.5 rounded-full border border-amber-300 -mt-1">
+              الطاقة: 0 / 5 🔥
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           3. قالب الكعك / الكنافة المقلوبة (Upside-Down Flip)
+           ========================================================= -->
+      <div id="scene-flip" class="mode-scene hidden relative z-20 flex flex-col items-center justify-center mt-4">
+        <svg width="220" height="195" viewBox="0 0 230 210" class="overflow-visible">
+          <ellipse cx="115" cy="182" rx="92" ry="13" fill="rgba(74,44,24,0.16)" />
+          <ellipse cx="115" cy="170" rx="95" ry="18" fill="#ffffff" stroke="#4a2c18" stroke-width="4.5"/>
+          <ellipse cx="115" cy="168" rx="76" ry="11" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+          <g id="upsideDownMold" style="transition: transform 0.35s ease-out;">
+            <path d="M52 72 L178 72 L192 164 L38 164 Z" fill="url(#copperMoldGrad)" stroke="#4a2c18" stroke-width="4.5" stroke-linejoin="round"/>
+            <line x1="76" y1="74" x2="68" y2="162" stroke="#78350f" stroke-width="3.5" stroke-linecap="round"/>
+            <line x1="115" y1="74" x2="115" y2="162" stroke="#78350f" stroke-width="3.5" stroke-linecap="round"/>
+            <line x1="154" y1="74" x2="162" y2="162" stroke="#78350f" stroke-width="3.5" stroke-linecap="round"/>
+            <rect x="32" y="158" width="166" height="10" rx="5" fill="#b45309" stroke="#4a2c18" stroke-width="3.5"/>
+            <path d="M58 88 L50 144" stroke="#fef08a" stroke-width="5" stroke-linecap="round" opacity="0.75"/>
+          </g>
+          <defs>
+            <linearGradient id="copperMoldGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#f59e0b"/>
+              <stop offset="50%" stop-color="#fbbf24"/>
+              <stop offset="100%" stop-color="#d97706"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <div id="flipCountdownBadge" class="hidden absolute top-12 bg-amber-600 text-white text-2xl font-black w-12 h-12 rounded-full flex items-center justify-center shadow-lg border-2 border-white">3</div>
+      </div>
+
+      <!-- =========================================================
+           4. خلط البهارات في الهاون (Mortar & Pestle)
+           ========================================================= -->
+      <div id="scene-mortar" class="mode-scene hidden relative z-20 flex flex-col items-center justify-center mt-5">
+        <div id="mortarBox" onclick="poundMortarOnce()" class="relative cursor-pointer flex flex-col items-center">
+          <svg width="210" height="190" viewBox="0 0 210 195" class="overflow-visible">
+            <ellipse cx="105" cy="176" rx="70" ry="11" fill="rgba(74,44,24,0.16)" />
+            <!-- المدقة النحاسية -->
+            <g id="pestleEl">
+              <path d="M126 24 C134 18, 146 24, 142 36 L112 104 L96 96 Z" fill="#b45309" stroke="#4a2c18" stroke-width="4" stroke-linejoin="round"/>
+              <circle cx="136" cy="27" r="9" fill="#f59e0b" stroke="#4a2c18" stroke-width="3.5"/>
+            </g>
+            <!-- وعاء الهاون النحاسي -->
+            <path d="M46 88 L164 88 C162 135, 146 160, 128 164 L134 174 L76 174 L82 164 C64 160, 48 135, 46 88 Z" fill="url(#copperMoldGrad)" stroke="#4a2c18" stroke-width="4.5" stroke-linejoin="round"/>
+            <rect x="40" y="80" width="130" height="12" rx="6" fill="#d97706" stroke="#4a2c18" stroke-width="4"/>
+            <!-- نقوش على الهاون -->
+            <path d="M58 114 Q105 126 152 114" fill="none" stroke="#78350f" stroke-width="3.5" stroke-linecap="round"/>
+            <path d="M64 134 Q105 144 146 134" fill="none" stroke="#fef08a" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+          </svg>
+          <span id="mortarCountBadge" class="text-[11px] font-black text-amber-900 bg-amber-200/90 px-3 py-0.5 rounded-full border border-amber-400 -mt-2">
+            الدقّات: 0 / 5 🌿
+          </span>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           5. الخبز المنفوخ في الفرن / الطابون (Puffed Taboon Bread)
+           ========================================================= -->
+      <div id="scene-taboon" class="mode-scene hidden relative z-20 flex flex-col items-center justify-center mt-4">
+        <svg width="240" height="195" viewBox="0 0 240 200" class="overflow-visible">
+          <!-- أرضية الطابون المتوهجة بالجمر -->
+          <ellipse cx="120" cy="172" rx="102" ry="18" fill="#7c2d12" stroke="#4a2c18" stroke-width="4"/>
+          <ellipse cx="120" cy="170" rx="88" ry="12" fill="#ea580c" opacity="0.8"/>
+
+          <!-- رغيف الخبز المنفوخ (مقسوم لنصفين ينشقان عند الكشف) -->
+          <g id="taboonBreadWhole">
+            <g id="breadLeftHalf">
+              <path d="M30 162 C30 85, 120 75, 120 75 L120 166 C75 168, 30 166, 30 162 Z" fill="#fde68a" stroke="#4a2c18" stroke-width="4"/>
+              <!-- بقع تحمير الطابون -->
+              <ellipse cx="68" cy="118" rx="12" ry="7" fill="#b45309" opacity="0.65"/>
+              <ellipse cx="95" cy="96" rx="10" ry="6" fill="#92400e" opacity="0.6"/>
+              <circle cx="52" cy="142" r="6" fill="#d97706" opacity="0.55"/>
+            </g>
+            <g id="breadRightHalf">
+              <path d="M210 162 C210 85, 120 75, 120 75 L120 166 C165 168, 210 166, 210 162 Z" fill="#fcd34d" stroke="#4a2c18" stroke-width="4"/>
+              <ellipse cx="172" cy="120" rx="13" ry="7" fill="#b45309" opacity="0.65"/>
+              <ellipse cx="145" cy="98" rx="10" ry="6" fill="#92400e" opacity="0.6"/>
+              <circle cx="186" cy="142" r="6" fill="#d97706" opacity="0.55"/>
+            </g>
+          </g>
+        </svg>
+      </div>
+
+      <!-- =========================================================
+           6. السلة التراثية المنسوجة (Woven Heritage Basket)
+           ========================================================= -->
+      <div id="scene-basket" class="mode-scene hidden relative z-20 flex flex-col items-center justify-center mt-4">
+        <svg width="220" height="195" viewBox="0 0 230 210" class="overflow-visible">
+          <ellipse cx="115" cy="180" rx="90" ry="13" fill="rgba(74,44,24,0.16)" />
+          <ellipse cx="115" cy="166" rx="92" ry="18" fill="#d97706" stroke="#4a2c18" stroke-width="4.5"/>
+          <ellipse cx="115" cy="164" rx="76" ry="12" fill="#fde68a" stroke="#92400e" stroke-width="2"/>
+          <g id="heritageBasketLid">
+            <path d="M100 54 C100 38, 130 38, 130 54" fill="none" stroke="#78350f" stroke-width="6" stroke-linecap="round"/>
+            <path d="M34 160 C38 72, 192 72, 196 160 Z" fill="#eab308" stroke="#4a2c18" stroke-width="4.5" stroke-linejoin="round"/>
+            <path d="M48 134 Q115 122 182 134" fill="none" stroke="#a16207" stroke-width="3.5" stroke-dasharray="10 6"/>
+            <path d="M62 108 Q115 98 168 108" fill="none" stroke="#a16207" stroke-width="3.5" stroke-dasharray="10 6"/>
+            <path d="M38 148 Q115 138 192 148" fill="none" stroke="#dc2626" stroke-width="9"/>
+            <path d="M44 148 Q115 138 186 148" fill="none" stroke="#fef08a" stroke-width="3" stroke-dasharray="6 8"/>
+            <circle cx="115" cy="118" r="7" fill="#dc2626" stroke="#4a2c18" stroke-width="2"/>
+            <circle cx="92" cy="122" r="5" fill="#16a34a" stroke="#4a2c18" stroke-width="2"/>
+            <circle cx="138" cy="122" r="5" fill="#16a34a" stroke="#4a2c18" stroke-width="2"/>
+          </g>
+        </svg>
+      </div>
+
+      <!-- =========================================================
+           7. آلة السحب / كبسولة الوصفات (Gachapon Capsule)
+           ========================================================= -->
+      <div id="scene-capsule" class="mode-scene hidden relative z-20 flex flex-col items-center justify-center mt-4">
+        <div class="relative w-48 h-52 flex items-center justify-center">
+          <div class="absolute inset-0 rounded-[2.4rem] bg-gradient-to-br from-white/75 via-sky-100/40 to-amber-100/50 border-4 border-[#94a3b8] shadow-inner overflow-hidden">
+            <div class="absolute top-3 right-3 w-4 h-20 bg-white/60 rounded-full rotate-12"></div>
+            <div class="absolute bottom-0 inset-x-0 h-10 bg-gradient-to-r from-[#d97706] via-[#f59e0b] to-[#d97706] border-t-4 border-[#4a2c18] flex items-center justify-center">
+              <div class="w-7 h-7 rounded-full bg-white border-4 border-[#4a2c18] flex items-center justify-center">
+                <div class="w-3.5 h-1 bg-[#4a2c18] rounded"></div>
+              </div>
+            </div>
+          </div>
+          <div id="gachaponCapsule" class="relative z-10 -mt-5">
+            <svg width="96" height="96" viewBox="0 0 110 110" class="overflow-visible">
+              <g id="capsuleTopHalf">
+                <path d="M15 55 A40 40 0 0 1 95 55 Z" id="capsuleColorFill" fill="#16a34a" stroke="#4a2c18" stroke-width="4.5"/>
+                <path d="M28 42 A26 26 0 0 1 56 24" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" opacity="0.8"/>
+              </g>
+              <g id="capsuleBottomHalf">
+                <path d="M15 55 A40 40 0 0 0 95 55 Z" fill="#fffbeb" stroke="#4a2c18" stroke-width="4.5"/>
+                <text x="55" y="78" text-anchor="middle" font-size="20" font-weight="900" fill="#d97706">؟</text>
+              </g>
+              <rect id="capsuleBelt" x="13" y="51" width="84" height="8" rx="4" fill="#fbbf24" stroke="#4a2c18" stroke-width="3.5"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           8. نفخ البخار / مسح الدخان (Steam & Spice Fog Wipe)
+           ========================================================= -->
+      <div id="scene-fog" class="mode-scene hidden absolute inset-0 z-20 flex items-center justify-center">
+        <div id="fogWrapper" class="relative w-68 h-60 rounded-[1.8rem] overflow-hidden cursor-crosshair touch-none">
+          <canvas id="fogCanvas" class="w-full h-full block"></canvas>
+          <div id="fogProgressPill" class="absolute bottom-2 left-1/2 -translate-x-1/2 bg-[#4a2c18]/75 text-white text-[10px] font-black px-3 py-0.5 rounded-full pointer-events-none">
+            انقشاع البخار: <span id="fogPercent">0</span>% 💨
+          </div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           9. الفقاعة السحرية المنفجرة (Magic Bubble Pop)
+           ========================================================= -->
+      <div id="scene-bubble" class="mode-scene hidden relative z-20 flex items-center justify-center">
+        <div id="giantMagicBubble" onclick="popGiantMagicBubble()" class="giant-bubble-float relative w-52 h-52 rounded-full border-4 border-white/90 flex flex-col items-center justify-center cursor-pointer transition-transform active:scale-95">
+          <!-- انعكاس ضوء الفقاعة -->
+          <div class="absolute top-5 right-7 w-10 h-5 bg-white/80 rounded-full -rotate-35"></div>
+          <div class="absolute top-11 right-5 w-3.5 h-3.5 bg-white/75 rounded-full"></div>
+          <!-- أيقونة ظل الطبق داخل الفقاعة -->
+          <span id="bubbleSilhouetteEmoji" class="text-6xl opacity-75 drop-shadow">🍲</span>
+          <span class="mt-2 text-[11px] font-black text-[#4a2c18] bg-white/80 px-3 py-0.5 rounded-full">انقر لتفجير الفقاعة! 🫧</span>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           10. فكّ حزام أو رباط الهدية (Gift Ribbon Untie)
+           ========================================================= -->
+      <div id="scene-ribbon" class="mode-scene hidden relative z-20 flex items-center justify-center">
+        <div id="giftBoxStage" onclick="untieGiftRibbon()" class="relative w-64 h-56 rounded-[1.8rem] bg-[#fffbeb] border-4 border-[#f59e0b] shadow-xl overflow-hidden flex items-center justify-center cursor-pointer">
+          <!-- الغلاف العلوي والسفلي -->
+          <div id="giftPanelTop" class="absolute top-0 inset-x-0 h-1/2 bg-gradient-to-b from-[#fef3c7] to-[#fde68a] border-b-2 border-amber-300 transition-transform duration-700"></div>
+          <div id="giftPanelBottom" class="absolute bottom-0 inset-x-0 h-1/2 bg-gradient-to-t from-[#fef3c7] to-[#fde68a] border-t-2 border-amber-300 transition-transform duration-700"></div>
+
+          <!-- الشريط العمودي والأفقي -->
+          <div id="ribbonVert" class="absolute inset-y-0 w-9 bg-gradient-to-r from-red-700 via-red-600 to-red-700 border-x-2 border-amber-300 transition-all duration-500"></div>
+          <div id="ribbonHoriz" class="absolute inset-x-0 h-9 bg-gradient-to-b from-red-700 via-red-600 to-red-700 border-y-2 border-amber-300 transition-all duration-500"></div>
+
+          <!-- عقدة الفيونكة الذهبية والحمراء في المنتصف -->
+          <div id="ribbonBow" class="relative z-10 flex flex-col items-center">
+            <div class="w-16 h-16 rounded-full bg-red-600 border-4 border-amber-300 shadow-lg flex items-center justify-center text-3xl">
+              🎀
+            </div>
+            <span class="mt-1.5 text-[10px] font-black text-white bg-red-700/90 px-2.5 py-0.5 rounded-full shadow">اسحب لفك الرباط!</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           11. تجميع المكونات السريع (Ingredient Snap Assembly)
+           ========================================================= -->
+      <div id="scene-snap" class="mode-scene hidden relative z-20 w-full h-full flex items-center justify-center">
+        <div id="snapTargetRing" class="w-28 h-28 rounded-full border-4 border-dashed border-amber-500/80 bg-white/60 flex items-center justify-center shadow-inner transition-transform duration-200">
+          <span class="text-3xl">🍽️</span>
+        </div>
+        <div id="snapIngredientsLayer" class="absolute inset-0 pointer-events-none flex items-center justify-center"></div>
+      </div>
+
+      <!-- =========================================================
+           12. مغناطيس المكونات (Ingredient Magnet)
+           ========================================================= -->
+      <div id="scene-magnet" class="mode-scene hidden relative z-20 w-full h-full flex items-center justify-center">
+        <div id="magnetCore" class="relative z-10 w-20 h-20 rounded-full bg-white border-4 border-red-500 shadow-lg flex items-center justify-center text-4xl transition-transform duration-200">
+          🧲
+        </div>
+        <div id="magnetParticlesLayer" class="absolute inset-0 pointer-events-none flex items-center justify-center"></div>
+      </div>
+
+      <!-- =========================================================
+           13. ستارة الضوء / عدسة الكاميرا (Iris Spotlight Aperture)
+           ========================================================= -->
+      <div id="scene-iris" class="mode-scene hidden absolute inset-0 z-20 flex items-center justify-center bg-[#1c130d] transition-all duration-700">
+        <div id="irisApertureCircle" class="w-16 h-16 rounded-full border-4 border-amber-400/80 bg-amber-200/10 flex items-center justify-center shadow-[0_0_50px_rgba(251,191,36,0.4)] transition-all duration-700">
+          <span class="text-2xl text-amber-300">📷</span>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           14. فقاعات الطهي / الغليان المتصاعد (Rising Simmer Bubbles)
+           ========================================================= -->
+      <div id="scene-rising" class="mode-scene hidden absolute inset-0 z-20 flex items-center justify-center">
+        <div id="risingMaskBox" class="relative w-64 h-56 rounded-[1.8rem] bg-[#fffbeb] border-4 border-amber-300 overflow-hidden flex items-center justify-center">
+          <div id="risingBubblesLayer" class="absolute inset-0"></div>
+          <span class="relative z-10 text-xs font-black text-amber-800 bg-white/85 px-3 py-1 rounded-full shadow">تصاعد فقاعات الطهي... 🫧</span>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           15. البطاقة المقلوبة ثلاثية الأبعاد (3D Heritage Card Flip)
+           ========================================================= -->
+      <div id="scene-card3d" class="mode-scene hidden relative z-20 flex items-center justify-center perspective-1000">
+        <div id="card3dInner" onclick="flip3DCardNow()" class="preserve-3d relative w-64 h-56 cursor-pointer">
+          <!-- الوجه الخلفي التراثي -->
+          <div class="backface-hidden absolute inset-0 rounded-[1.8rem] bg-gradient-to-br from-[#78350f] via-[#92400e] to-[#451a03] border-4 border-[#fbbf24] shadow-2xl p-4 flex flex-col items-center justify-center text-amber-100">
+            <div class="w-full h-full border-2 border-dashed border-amber-300/60 rounded-2xl flex flex-col items-center justify-center p-3">
+              <span class="text-4xl mb-2">🕌</span>
+              <span class="text-sm font-black text-amber-200">وصفة اليوم السرية</span>
+              <span class="text-[10px] font-bold text-amber-300/90 mt-1">انقر لقلب البطاقة 180°</span>
+            </div>
+          </div>
+          <!-- الوجه الأمامي (سيتم عرض النتيجة عليه) -->
+          <div id="card3dFrontSlot" class="backface-hidden rotate-y-180 absolute inset-0 flex items-center justify-center"></div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           16. الميزان أو عدّاد الشهية (Appetite Meter Gauge)
+           ========================================================= -->
+      <div id="scene-gauge" class="mode-scene hidden relative z-20 flex flex-col items-center justify-center">
+        <svg width="240" height="160" viewBox="0 0 240 160" class="overflow-visible">
+          <!-- قوس العداد بأربعة ألوان -->
+          <path d="M 30 130 A 90 90 0 0 1 75 52" fill="none" stroke="#22c55e" stroke-width="20" stroke-linecap="round"/>
+          <path d="M 75 52 A 90 90 0 0 1 120 40" fill="none" stroke="#f59e0b" stroke-width="20"/>
+          <path d="M 120 40 A 90 90 0 0 1 165 52" fill="none" stroke="#ef4444" stroke-width="20"/>
+          <path d="M 165 52 A 90 90 0 0 1 210 130" fill="none" stroke="#ec4899" stroke-width="20" stroke-linecap="round"/>
+
+          <!-- تسميات المستويات -->
+          <text x="24" y="150" font-size="11" font-weight="900" fill="#15803d">خفيف 🥗</text>
+          <text x="72" y="32" font-size="11" font-weight="900" fill="#b45309">دسم 🍖</text>
+          <text x="148" y="32" font-size="11" font-weight="900" fill="#b91c1c">حار 🌶️</text>
+          <text x="184" y="150" font-size="11" font-weight="900" fill="#be185d">حلو 🍯</text>
+
+          <!-- إبرة المؤشر المتحركة -->
+          <g id="gaugeNeedleGroup" style="transform-origin: 120px 130px; transform: rotate(-75deg); transition: transform 0.15s ease-out;">
+            <polygon points="116,130 120,52 124,130" fill="#4a2c18"/>
+            <circle cx="120" cy="130" r="11" fill="#f59e0b" stroke="#4a2c18" stroke-width="3.5"/>
+          </g>
+        </svg>
+        <span id="gaugeStatusLabel" class="text-xs font-black text-[#4a2c18] bg-white/90 px-3.5 py-1 rounded-full border border-amber-300 shadow-sm mt-1">
+          عدّاد الشهية جاهز للقياس! 🧭
+        </span>
+      </div>
+
+      <!-- =========================================================
+           17. المرآة السحرية / انعكاس القهوة والشاي (Coffee & Tea Ripples)
+           ========================================================= -->
+      <div id="scene-coffee" class="mode-scene hidden relative z-20 flex items-center justify-center">
+        <div class="relative w-52 h-52 rounded-full bg-white border-4 border-[#d97706] shadow-2xl flex items-center justify-center">
+          <!-- يد الفنجان -->
+          <div class="absolute -left-6 w-8 h-12 rounded-l-full border-4 border-[#d97706] bg-white -z-10"></div>
+          <!-- سطح القهوة العربية الذهبية / الشاي -->
+          <div class="relative w-44 h-44 rounded-full bg-gradient-to-br from-[#78350f] via-[#451a03] to-[#270e02] overflow-hidden flex items-center justify-center shadow-inner">
+            <!-- دوائر التموج السحرية -->
+            <div class="ripple-ring absolute w-24 h-24 rounded-full border border-amber-300/70"></div>
+            <div class="ripple-ring absolute w-24 h-24 rounded-full border border-amber-200/60" style="animation-delay: 0.45s;"></div>
+            <div class="ripple-ring absolute w-24 h-24 rounded-full border border-amber-100/50" style="animation-delay: 0.9s;"></div>
+            <span id="coffeeReflectionIcon" class="text-5xl opacity-35 transition-all duration-700 scale-75">☕</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           18. تقطيع الشرائح بالسكين (Chef Knife Slice Fan)
+           ========================================================= -->
+      <div id="scene-knife" class="mode-scene hidden relative z-20 flex items-center justify-center">
+        <div id="knifeCoverBox" class="relative w-64 h-56 rounded-[1.8rem] overflow-hidden border-4 border-[#94a3b8] shadow-xl flex">
+          <!-- 6 شرائح تنفتح كالمروحة -->
+          <div class="knife-slice flex-1 h-full bg-gradient-to-b from-slate-200 to-slate-300 border-l border-slate-400/50 transition-transform duration-700 origin-bottom"></div>
+          <div class="knife-slice flex-1 h-full bg-gradient-to-b from-slate-100 to-slate-300 border-l border-slate-400/50 transition-transform duration-700 origin-bottom"></div>
+          <div class="knife-slice flex-1 h-full bg-gradient-to-b from-slate-200 to-slate-300 border-l border-slate-400/50 transition-transform duration-700 origin-bottom"></div>
+          <div class="knife-slice flex-1 h-full bg-gradient-to-b from-slate-100 to-slate-300 border-l border-slate-400/50 transition-transform duration-700 origin-bottom"></div>
+          <div class="knife-slice flex-1 h-full bg-gradient-to-b from-slate-200 to-slate-300 border-l border-slate-400/50 transition-transform duration-700 origin-bottom"></div>
+          <div class="knife-slice flex-1 h-full bg-gradient-to-b from-slate-100 to-slate-300 transition-transform duration-700 origin-bottom"></div>
+
+          <!-- خط السكين الضوئي -->
+          <div id="knifeBeam" class="hidden absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div class="w-72 h-2 bg-white shadow-[0_0_18px_#fff,0_0_30px_#38bdf8] rounded-full"></div>
+          </div>
+          <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <span class="text-4xl">🔪</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           19. موجة التوابل والزعفران (Saffron & Sumac Wave)
+           ========================================================= -->
+      <div id="scene-spice" class="mode-scene hidden absolute inset-0 z-20 overflow-hidden flex items-center justify-center">
+        <div class="text-center">
+          <span class="text-5xl">🌶️</span>
+          <p class="text-xs font-black text-[#78350f] mt-1">موجات الزعفران والسماق الدافئة</p>
+        </div>
+        <!-- 3 موجات لونية حريرية متتالية -->
+        <div id="spiceWave1" class="hidden absolute inset-0 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 opacity-95"></div>
+        <div id="spiceWave2" class="hidden absolute inset-0 bg-gradient-to-r from-rose-800 via-red-600 to-rose-800 opacity-95"></div>
+        <div id="spiceWave3" class="hidden absolute inset-0 bg-gradient-to-r from-amber-700 via-orange-500 to-amber-700 opacity-95"></div>
+      </div>
+
+      <!-- =========================================================
+           20. رفع السفرة / الغطاء القماشي (Embroidered Cloth Lift)
+           ========================================================= -->
+      <div id="scene-cloth" class="mode-scene hidden relative z-20 flex items-center justify-center">
+        <div id="embroideredCloth" onclick="liftEmbroideredCloth()" class="relative w-64 h-56 rounded-[1.8rem] bg-[#fffdf8] border-4 border-[#dc2626] shadow-2xl p-4 flex flex-col items-center justify-center cursor-pointer overflow-hidden">
+          <!-- نقوش تطريز تراثية على حواف المنديل -->
+          <div class="absolute inset-2 border-4 border-dashed border-[#dc2626] rounded-2xl pointer-events-none"></div>
+          <div class="absolute inset-4 border-2 border-[#16a34a] rounded-xl pointer-events-none"></div>
+          <span class="text-4xl mb-1">🪡</span>
+          <span class="text-sm font-black text-[#991b1b]">منديل السفرة المطرّز</span>
+          <span class="text-[10px] font-bold text-[#78350f] mt-0.5">ارفع الغطاء من الزاوية ✨</span>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           21. المفاجأة من تحت القبة / الفانوس (Lantern Glow Reveal)
+           ========================================================= -->
+      <div id="scene-lantern" class="mode-scene hidden relative z-20 flex flex-col items-center justify-center">
+        <div id="lanternGlowHalo" class="w-44 h-44 rounded-full bg-amber-400/20 flex items-center justify-center transition-all duration-700">
+          <svg width="130" height="160" viewBox="0 0 130 160" class="overflow-visible">
+            <!-- حلقة الفانوس -->
+            <circle cx="65" cy="16" r="8" fill="none" stroke="#b45309" stroke-width="4"/>
+            <!-- قبة الفانوس -->
+            <path d="M40 46 C45 24, 85 24, 90 46 Z" fill="#d97706" stroke="#4a2c18" stroke-width="3.5"/>
+            <!-- جسم الفانوس الزجاجي المتوهج -->
+            <polygon points="36,46 94,46 84,124 46,124" fill="#fef08a" stroke="#4a2c18" stroke-width="4"/>
+            <!-- شعلة الشمعة داخل الفانوس -->
+            <path d="M65 68 C55 84, 55 102, 65 106 C75 102, 75 84, 65 68 Z" fill="#f97316" class="flame-dance"/>
+            <!-- قاعدة الفانوس -->
+            <rect x="40" y="124" width="50" height="12" rx="4" fill="#b45309" stroke="#4a2c18" stroke-width="3.5"/>
+          </svg>
+        </div>
+      </div>
+
+    </section>
+    <div class="shact">
+      <button id="revealBtn" type="button" class="reveal-action-btn w-full py-3 rounded-2xl text-white font-black text-base flex items-center justify-center gap-2">
+        <span id="btnIcon" class="text-xl">✨</span><span id="btnLabel">اكشف</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<dialog id="foodDlg">
+  <h3 id="foodTitle">أكلة جديدة</h3>
+  <label for="fName">اسم الأكلة</label>
+  <input type="text" id="fName" autocomplete="off" maxlength="40">
+  <label for="fType">النوع</label>
+  <select id="fType"><option value="lunch">غدا</option><option value="dinner">عشا</option><option value="sweet">حلو</option></select>
+  <div id="roleWrap"><label for="fRole">بالعشا هي</label>
+  <select id="fRole"><option value="main">طبق رئيسي</option><option value="side">شي خفيف جنب الرئيسي</option></select></div>
+  <label for="fMode">طريقة الكشف</label>
+  <select id="fMode"></select>
+  <label>الصورة</label>
+  <div class="photo" id="photoBox" tabindex="0" role="button" aria-label="اختار صورة"></div>
+  <input type="file" id="fFile" accept="image/*" hidden>
+  <div class="err" id="fErr"></div>
+  <div class="acts">
+    <button type="button" id="saveBtn">حفظ</button>
+    <button type="button" class="del" id="delBtn" hidden>حذف</button>
+    <button type="button" class="ghost" id="foodCancel">إلغاء</button>
+  </div>
+</dialog>
+
+<dialog id="catDlg">
+  <h3>أكلات المنطقة</h3>
+  <p style="margin:0;color:var(--soft);font-size:13.5px;font-weight:600">اختاروا اللي بتحبوه. كل أكلة جاية مع صورتها وطريقة كشفها، والمضافة قبل معلّمة.</p>
+  <div class="catlist" id="catList"></div>
+  <div class="acts"><button type="button" id="catAdd">إضافة</button><button type="button" class="ghost" id="catAll">تحديد الكل</button><button type="button" class="ghost" id="catClose">إغلاق</button></div>
+</dialog>
+
+<dialog id="whyDlg">
+  <h3 id="whyTitle">تغيير بسبب قهري</h3>
+  <label for="reasonSel" style="margin-top:4px">شو السبب القهري؟</label>
+  <select id="reasonSel">
+    <option value="">اختار السبب…</option>
+    <option>ضيوف غير متوقعين</option>
+    <option>مرض أو تعب شديد</option>
+    <option>المكونات غير متوفرة</option>
+    <option>انقطاع غاز أو كهربا</option>
+    <option>ظرف طارئ أو سفر</option>
+    <option value="other">سبب ثاني</option>
+  </select>
+  <textarea id="reasonTxt" rows="2" placeholder="اكتب السبب" hidden style="margin-top:8px"></textarea>
+  <div class="err" id="whyErr"></div>
+  <div class="acts"><button type="button" id="whyOk">غيّر واكشف من جديد</button><button type="button" class="ghost" id="whyCancel">إلغاء</button></div>
+</dialog>
+
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
